@@ -10,7 +10,7 @@ tcpSerSock = socket(AF_INET, SOCK_STREAM)
 # Fill in start.
 tcpSerPort = 8888
 tcpSerSock.bind(("",tcpSerPort))
-tcpSerSock.listen(10)
+tcpSerSock.listen(5)
 # Fill in end.
 ########################################################################################
 
@@ -55,19 +55,18 @@ while 1:
             ########################################################################################
             c =  socket(AF_INET,SOCK_STREAM)
             ########################################################################################
-            
             hostn = filename
+            hostn = filename.replace("www.","",1)
             #print(hostn)
             try:           
                 # Connect to the socket to port 80
                 # Fill in start.
-                #hostn = filename.replace("http://www.","",1)
+               # hostn = filename.replace("http://www.","",1)
                 print("00")
-                hostn = filename.replace("www.","",1)
+
                 
-                
-                c.connect(("ee.columbia.edu",80))
-                
+                c.connect((hostn,80))
+
                 print("88")
                 # Fill in end.
                 # Create a temporary file on this socket and ask port 80 for the file requested by the client
@@ -76,15 +75,17 @@ while 1:
                 #print("GET "+  filename + "HTTP/1.1\r\nHost: www.ee.columbia.edu\r\n\r\n")
                # print("Host: " + hostn + "\n\r")
                 
-                #GET http://www.ee.columbia.edu/keren-bergman HTTP/1.10\r\n\r\n
-#GET http://www.ee.columbia.edu/keren-bergman HTTP/1.0\r\nHost: www.ee.columbia.edu/keren-bergman\n\n
+                                        #GET http://www.ee.columbia.edu/keren-bergman HTTP/1.10\r\n\r\n
+                                        #GET http://www.ee.columbia.edu/keren-bergman HTTP/1.0\r\nHost: www.ee.columbia.edu/keren-bergman\n\n
 
-                getL = "GET " + filename + " HTTP/1.0\r\n\r\n"
+                getL = "GET " + "http://" + filename + " HTTP/1.0\r\n\r\n"
                 hostL = "Host: "+ hostn + "\r\n\r\n"
-                hostN = "Host: www.ee.columbia.edu\r\n\r\n"
+             
+
+
                 a = open("getLog.txt", "a+")
                 a.write(getL)
-                a.write(hostL)
+                
                 a.write("BREAK\n")
                 #a.close()
                 print("1.1")
