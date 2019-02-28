@@ -24,17 +24,19 @@ while 1:
     message = tcpCliSock.recv(1024)
     ########################################################################################
     
-    print(message)
+    #print(message)
     # Extract the filename from the given message
-    print(message.split()[1])
+    #print(message.split()[1])
     filename = message.split()[1].partition("/")[2]
-    print(filename)
+    #print(filename)
     fileExist = "false"
     filetouse = "/" + filename
     print(filetouse)
     try:
         # Check wether the file exist in the cache
+        print("INSIDE")
         f = open(filetouse[1:], "r")
+        print("OPENED FILE")
         outputdata = f.readlines()
         fileExist = "true"
         # ProxyServer finds a cache hit and generates a response message
@@ -106,14 +108,14 @@ while 1:
                 # Create a new file in the cache for the requested file.
                 # Also send the response in the buffer to client socketand the corresponding file in the cache
                 #fileN = "./" + filename + ".txt"
-                #tmpFile = open("./" + filename,"wb")
+                tmpFile = open("./" + filename,"wb")
                # print("./" + filename)
                 print("3")
                 ########################################################################################
                 # Fill in start.
                 for i in range(0, len(buff)):
                     a.write(buff[i])
-                    #tmpFile.write(buff[i])
+                    tmpFile.write(buff[i])
                     tcpCliSock.send(buff[i])
                 print("4")
                 #tmpFile.close()
