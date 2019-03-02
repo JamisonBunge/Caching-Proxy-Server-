@@ -7,7 +7,7 @@ from threading import Thread,Lock
 
 #Global Constants: not my code, need to modify
 MAX_PENDING = 5
-MAX_BUFSIZE = 4096
+BUF_SIZE = 1024
 EXIT_CODE = True
 STATUS_LOOKUP = {200: "OK", 201: "Created", 202: "Accepted", 204: "No Content",
                  301: "Moved Permanently", 302: "Moved Temporarily", 304: "Not Modified",
@@ -19,24 +19,21 @@ def main():
     #Create File Hierarchy
     makeDirectory()
     #Create Server Socket
-    #serverSocket = establishServer()
+    serverSocket = establishServer()
     #Create a thread that will allow the user to kill the server from the terminal.
     #listenForUser = Thread(target=killServer, args=())
     #listenForUser.start()
-    serverSocket = socket(AF_INET, SOCK_STREAM)
-    tcpSerPort = 8888  
-    serverSocket.bind(("",tcpSerPort))
-    serverSocket.listen(1)
 
     while True:
+
         # Start receiving data from the client
         print('Ready to serve...')
-        tcpCliSock, addr = serverSocket.accept()
+        clientSocket, addr = serverSocket.accept()
         print('Received a connection from:', addr)
 
-        ########################################################################################
-        message = tcpCliSock.recv(1024)
-        ########################################################################################
+
+        message = clientSocket.recv(BUF_SIZE)
+
         b = open("messageLog.txt", "a+")
         b.write(message)
         b.write("\n")
@@ -55,7 +52,9 @@ def main():
             # Check wether the file exist in the cache
             print("INSIDE")
             #try:
-            f = open(filetouse[1:], "r")
+            fileToRead = filename.replace("/",".")
+            fileToRead = "/" + fileToRead
+            f = open(fileToRead[1:], "r")
             # except:
             #     print("fileToUse failed")
             #     raise IOError
@@ -63,12 +62,12 @@ def main():
             outputdata = f.readlines()
             fileExist = "true"
             # ProxyServer finds a cache hit and generates a response message
-            tcpCliSock.send("HTTP/1.0 200 OK\r\n")
-            tcpCliSock.send("Content-Type:text/html\r\n")
+            clientSocket.send("HTTP/1.0 200 OK\r\n")
+            clientSocket.send("Content-Type:text/html\r\n")
             ########################################################################################
             # Fill in start.
             for g in range(0, len(outputdata)):
-                tcpCliSock.send(outputdata[g])
+                clientSocket.send(outputdata[g])
             # Fill in end.      
             ########################################################################################
 
@@ -134,47 +133,48 @@ def main():
                     
                     print("GET {object} HTTP/1.0".format(object=local_path))
                     print("Host: {host}\n".format(host=host_name))
-                    #fileobj.write(hostL)
-                    #fileobj.write("\n\n")
-                    #fileobj.write("\r\n")
-                    #fileobj.write("Host: " + hostn + "\n\r")
+ 
                     print("2")
                     # Read the response into buffer
                     ########################################################################################
                     # Fill in start.
-                    buff = fileobj.readlines()  
+                    buffer = fileobj.readlines()  
                     print("2.1")              
                     # Fill in end.
                     ########################################################################################
                     # Create a new file in the cache for the requested file.
                     # Also send the response in the buffer to client socketand the corresponding file in the cache
-                    #fileN = "./" + filename + ".txt"
-                    tmpFile = open("./" + filename,"w")
+                    #fileN = "./" + filename + ".txt" 
+
+                    writeName = filename.replace("/",".")
+                    #print("writeName: " +writeName)
+                    tmpFile = open("./" + writeName,"wb")
+                   
                 # print("./" + filename)
                     print("3")
-                    ########################################################################################
+
                     # Fill in start.
-                    for line in buff:
+                    for m in buffer:
                         #a.write(buff[i])
-                        tmpFile.write(line)
-                        print(buff)
-                        tcpCliSock.send(line)
+                        tmpFile.write(m)
+                        #print(buff)
+                        clientSocket.send(m)
                     print("4")
                     tmpFile.close()
-                    #a.close()
-                    # Fill in end.
-                    ########################################################################################
+
                 except:
                     print("Illegal request")
             else:
                 # HTTP response message for file not found
-                ########### #############################################################################
-                # Fill in start.
                 print '404: Not Found'
+                response += "<html><body>\n" \
+                "<h1>" + "404: Not Found" + "</h1>\n" \
+                "</body></html>\n"
+                clientSocket.send(response)
                 # Fill in end.
                 ########################################################################################
         # Close the client and the server sockets
-        tcpCliSock.close()
+        clientSocket.close()
     # Fill in start.
     serverSocket.close()
     # Fill in end.
