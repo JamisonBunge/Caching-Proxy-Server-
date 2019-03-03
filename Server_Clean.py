@@ -7,6 +7,8 @@ from threading import Thread,Lock
 
 #Global Constants: not my code, need to modify
 MAX_PENDING = 5
+DIRECTORY_ROOT = "Cache"
+WORKING_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 BUF_SIZE = 1024
 EXIT_CODE = True
 STATUS_LOOKUP = {200: "OK", 201: "Created", 202: "Accepted", 204: "No Content",
@@ -17,9 +19,12 @@ STATUS_LOOKUP = {200: "OK", 201: "Created", 202: "Accepted", 204: "No Content",
 def main():
     
     #Create File Hierarchy
-    makeDirectory()
+    makeDirectory(DIRECTORY_ROOT)
+    os.chdir(DIRECTORY_ROOT)
     #Create Server Socket
     serverSocket = establishServer()
+    print(WORKING_DIRECTORY)
+
     #Create a thread that will allow the user to kill the server from the terminal.
     #listenForUser = Thread(target=killServer, args=())
     #listenForUser.start()
@@ -32,16 +37,16 @@ def main():
         print('Received a connection from:', addr)
 
 
-        message = clientSocket.recv(BUF_SIZE)
+        message = clientSocket.recv(BUF_SIZE)   
 
         b = open("messageLog.txt", "a+")
         b.write(message)
         b.write("\n")
         b.close()
 
-        #print(message)
+        print(message)
         # Extract the filename from the given message
-        print(message.split()[1])
+        #print(message.split()[1])
         filename = message.split()[1].partition("/")[2]
         #print(filename)
         fileExist = "false"
@@ -61,13 +66,14 @@ def main():
             print("OPENED FILE")
             outputdata = f.readlines()
             fileExist = "true"
+
             # ProxyServer finds a cache hit and generates a response message
             clientSocket.send("HTTP/1.0 200 OK\r\n")
             clientSocket.send("Content-Type:text/html\r\n")
             ########################################################################################
             # Fill in start.
-            for g in range(0, len(outputdata)):
-                clientSocket.send(outputdata[g])
+            for m in outputdata:
+                clientSocket.send(m)
             # Fill in end.      
             ########################################################################################
 
@@ -76,46 +82,44 @@ def main():
         except IOError:
             if fileExist == "false":
                 # Create a socket on the proxyserver
-                ########################################################################################
-                c =  socket(AF_INET,SOCK_STREAM)
-                ########################################################################################
                 
-                filenamePart = filename.partition("/")
-                if "www." in filenamePart[0]:
-                    hostn = filenamePart[0].replace("www.","",1)
+                c =  socket(AF_INET,SOCK_STREAM)
+
+                """
+                Break the filename into a string array 
+                seperated by '/'. This will allow us to check to see if a new 
+                host name exists so the socket connection can be reassigned
+                """
+                fileNameAsStringArray = filename.partition("/")
+
+                if "www." in fileNameAsStringArray[0]: #
+                    hostn = fileNameAsStringArray[0].replace("www.","",1)
                     print("HostName: " +hostn)
-                    host_name = filenamePart[0]
-                    local_path = "/" + filenamePart[2]
+                    """
+                    Whenever a new host is going to be connected, we want to save
+                    all of the the associated files in a new folder. This way, the cached 
+                    files for each website can be grouped together.
+                    """
+                    os.chdir(WORKING_DIRECTORY + "/" + DIRECTORY_ROOT)
+                    makeDirectory(hostn.replace("/","."))
+                    #changeDirectory(hostn.replace("/","."))
+                    os.chdir(WORKING_DIRECTORY + "/" + DIRECTORY_ROOT + "/" + hostn.replace("/","."))
+
+                    hostNameForRequest = fileNameAsStringArray[0]
+                    relativePath = "/" + fileNameAsStringArray[2]
                 else:
-                    local_path = "/" + filename
+                    relativePath = "/" + filename
 
-
-                #hostn = filename
-                # hostn = filename.replace("www.","",1)
-                #
-                # tempHost = hostn.split("/",1)[0]
-                # print("TempHost: " +tempHost)
                 try:           
                     # Connect to the socket to port 80
-                    # Fill in start.
                     print("00")
                     c.connect((hostn,80))
                     print("88")
-                    # Fill in end.
+           
                     # Create a temporary file on this socket and ask port 80 for the file requested by the client
-                    fileobj = c.makefile('r', 0) #Instead of using send and recv, we can use makefile
+                    fileobj = c.makefile('r', 0) 
                     print("1")
 
-
-
-                    #print("GET "+  filename + "HTTP/1.1\r\nHost: www.ee.columbia.edu\r\n\r\n")
-                # print("Host: " + hostn + "\n\r")
-                    
-                                            #GET http://www.ee.columbia.edu/keren-bergman HTTP/1.10\r\n\r\n
-                                            #GET http://www.ee.columbia.edu/keren-bergman HTTP/1.0\r\nHost: www.ee.columbia.edu/keren-bergman\n\n
-
-                   # getL = "GET " + "http://" + filename + " HTTP/1.0\r\n\r\n"
-                    #hostL = "Host: "+ hostn + "\r\n\r\n"
                 
 
 
@@ -126,26 +130,24 @@ def main():
                     #a.close()
                     print("1.1")
 
-                    #fileobj.write(getL)#Host: " + hostn + "\r\n\r\n")
-
-                    fileobj.write("GET {object} HTTP/1.0\r\n".format(object=local_path))
-                    fileobj.write("Host: {host}\r\n\r\n".format(host=host_name))
+                    #Pass the arguments into the write lines using string format
+                    fileobj.write("GET {object} HTTP/1.0\r\n".format(object=relativePath))
+                    fileobj.write("Host: {host}\r\n\r\n".format(host=hostNameForRequest))
                     
-                    print("GET {object} HTTP/1.0".format(object=local_path))
-                    print("Host: {host}\n".format(host=host_name))
+                    #print the lines to the terminal 
+                    print("GET {object} HTTP/1.0".format(object=relativePath))
+                    print("Host: {host}\n".format(host=hostNameForRequest))
  
                     print("2")
                     # Read the response into buffer
-                    ########################################################################################
+    
                     # Fill in start.
                     buffer = fileobj.readlines()  
                     print("2.1")              
                     # Fill in end.
-                    ########################################################################################
-                    # Create a new file in the cache for the requested file.
-                    # Also send the response in the buffer to client socketand the corresponding file in the cache
-                    #fileN = "./" + filename + ".txt" 
 
+
+                    # Create a new file in the cache for the requested file.
                     writeName = filename.replace("/",".")
                     #print("writeName: " +writeName)
                     tmpFile = open("./" + writeName,"wb")
@@ -191,26 +193,24 @@ def establishServer():
 
 
 
-def makeDirectory():
+def makeDirectory(dirName):
     """
     This function creates the folder the files will be saved
     into as well as changes the working directory so the program 
     will write into the new folder 
     """
-    
-    dirName = 'Cache'
 
     try:
-
         os.mkdir(dirName)
         print(dirName + " directory created.")
 
     except OSError:
         print(dirName + " directory already exists")
-    
-    
-    os.chdir(dirName) #Change the operating directory to write files into this folder 
-
+ 
+def changeDirectory(dirName):
+    print(os.chdir(os.path.dirname(os.path.realpath(__file__))))
+    #os.chdir(DIRECTORY_ROOT)
+    #os.chdir(dirName)
 
 def killServer():
     print("To close the server type \"exit\" at any time.")
