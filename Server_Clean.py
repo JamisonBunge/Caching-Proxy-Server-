@@ -4,6 +4,12 @@ from socket import *
 import sys
 import os
 from threading import Thread,Lock
+from collections import namedtuple
+from wsgiref.handlers import format_date_time
+from datetime import datetime
+from time import mktime
+#import ordered_set
+cachedFiles = dict()
 
 #Global Constants: not my code, need to modify
 MAX_PENDING = 5
@@ -15,9 +21,32 @@ STATUS_LOOKUP = {200: "OK", 201: "Created", 202: "Accepted", 204: "No Content",
                  301: "Moved Permanently", 302: "Moved Temporarily", 304: "Not Modified",
                  400: "Bad Request", 401: "Unauthorized", 403: "Forbidden", 404: "Not Found",
                  500: "Internal Server Error", 501: "Not Implemented", 502: "Bad Gateway", 503: "Service Unavailable"}
+"""
+Internal Datastructure Format
+-----------------------------
+
+
+The cache information is stored in a dictionary called cachedFiles
+KEY -> The filename formated so it can be written to the hard disk
+VALUE -> A tuple that stores information used to see if the file is out of date 
+
+    Tuple Feilds
+        0 -> Last-Modifed parameter from the the http response
+                NOTE: if this this was not found in the header then this value will be the time the request was made
+        1 -> The date the get reqeust was made / the date the saved file was created 
+        2 -> The path to the cached file within the created hierarchy 
+        3 -> hostname 
+        4 -> host for the GET request
+        5 -> file for the GET request 
+
+
+
+
+"""
+
+
 
 def main():
-    
     #Create File Hierarchy
     makeDirectory(DIRECTORY_ROOT)
     os.chdir(DIRECTORY_ROOT)
@@ -39,11 +68,6 @@ def main():
 
         message = clientSocket.recv(BUF_SIZE)   
 
-        b = open("messageLog.txt", "a+")
-        b.write(message)
-        b.write("\n")
-        b.close()
-
         print(message)
         # Extract the filename from the given message
         #print(message.split()[1])
@@ -51,18 +75,81 @@ def main():
         #print(filename)
         fileExist = "false"
         filetouse = "/" + filename
-        print("fileName: " + filetouse )
-    #print(filetouse)
+ 
         try:
             # Check wether the file exist in the cache
-            print("INSIDE")
-            #try:
+            
+           
             fileToRead = filename.replace("/",".")
+            fileToCheckTime = fileToRead 
             fileToRead = "/" + fileToRead
-            f = open(fileToRead[1:], "r")
-            # except:
-            #     print("fileToUse failed")
-            #     raise IOError
+            print(fileToRead)
+            
+            ############################################################
+
+            if fileToCheckTime in cachedFiles.keys():
+                
+                f = open(fileToRead[1:], "r")
+                tupleResponse = cachedFiles.get(fileToCheckTime)
+                #I am parsing all of the relevent information into seperate variables
+                #This is not needed, I'm just doing it for readablity
+                savedDateLastMod =tupleResponse[0]
+                savedDateCached = tupleResponse[1]
+                sxavedActivePath = tupleResponse[2]
+                savedHostn = tupleResponse[3]
+                savedHostNameForRequest = tupleResponse[4]
+                savedRelativePath = tupleResponse[5]
+
+                #CHECK TO SEE IF MODIFED
+                socketToCheckIfModded =  socket(AF_INET,SOCK_STREAM)
+                socketToCheckIfModded.connect((savedHostn,80))
+
+                fileob = c.makefile('r', 0) 
+                   
+        
+                #Pass the arguments into the write lines using string format
+                fileob.write("GET {object} HTTP/1.0\r\n".format(object=savedRelativePath))
+                fileob.write("Host: {host}\r\n".format(host=savedHostNameForRequest))
+                fileob.write("If-Modified-Since: {date}\r\n\r\n".format(date=savedDateLastMod))
+
+                #Print the lines
+                print("GET {object} HTTP/1.0".format(object=relativePath))
+                print("Host: {host}\n".format(host=hostNameForRequest))
+                print("If-Modified-Since: {date}\r\n\r\n".format(date=savedDateLastMod))
+
+                buff = fileobj.readline()
+                print("first line of response: " + buff)
+
+                
+
+                
+                print("THIS: " +tupleResponse[1])
+                
+                
+                
+                
+                
+                print(cachedFiles.get(fileToCheckTime))
+                
+
+
+
+
+
+            else:
+                print("Manually throwing IOError")
+                raise IOError
+                
+
+
+
+
+
+
+
+
+            ############################################################
+    
             print("OPENED FILE")
             outputdata = f.readlines()
             fileExist = "true"
@@ -70,14 +157,15 @@ def main():
             # ProxyServer finds a cache hit and generates a response message
             clientSocket.send("HTTP/1.0 200 OK\r\n")
             clientSocket.send("Content-Type:text/html\r\n")
-            ########################################################################################
-            # Fill in start.
+
+            #send data from the file to the client 
             for m in outputdata:
                 clientSocket.send(m)
-            # Fill in end.      
-            ########################################################################################
+
+            
 
             print('Read from cache')
+
         # Error handling for file not found in cache
         except IOError:
             if fileExist == "false":
@@ -95,6 +183,7 @@ def main():
                 if "www." in fileNameAsStringArray[0]: #
                     hostn = fileNameAsStringArray[0].replace("www.","",1)
                     print("HostName: " +hostn)
+                    
                     """
                     Whenever a new host is going to be connected, we want to save
                     all of the the associated files in a new folder. This way, the cached 
@@ -103,6 +192,7 @@ def main():
                     os.chdir(WORKING_DIRECTORY + "/" + DIRECTORY_ROOT)
                     makeDirectory(hostn.replace("/","."))
                     #changeDirectory(hostn.replace("/","."))
+                    activePath = WORKING_DIRECTORY + "/" + DIRECTORY_ROOT + "/" + hostn.replace("/",".")
                     os.chdir(WORKING_DIRECTORY + "/" + DIRECTORY_ROOT + "/" + hostn.replace("/","."))
 
                     hostNameForRequest = fileNameAsStringArray[0]
@@ -114,26 +204,16 @@ def main():
                     # Connect to the socket to port 80
                     print("00")
                     c.connect((hostn,80))
-                    print("88")
-           
+                    print("01")
+                    #print(time.gmtime(0))
                     # Create a temporary file on this socket and ask port 80 for the file requested by the client
                     fileobj = c.makefile('r', 0) 
                     print("1")
-
-                
-
-
-                    #a = open("getLog.txt", "a+")
-                    #a.write(getL)
-                    
-                    #a.write("BREAK\n")
-                    #a.close()
-                    print("1.1")
-
+        
                     #Pass the arguments into the write lines using string format
                     fileobj.write("GET {object} HTTP/1.0\r\n".format(object=relativePath))
                     fileobj.write("Host: {host}\r\n\r\n".format(host=hostNameForRequest))
-                    
+
                     #print the lines to the terminal 
                     print("GET {object} HTTP/1.0".format(object=relativePath))
                     print("Host: {host}\n".format(host=hostNameForRequest))
@@ -141,8 +221,7 @@ def main():
                     print("2")
                     # Read the response into buffer
     
-                    # Fill in start.
-                    buffer = fileobj.readlines()  
+                    buffer = fileobj.readlines() 
                     print("2.1")              
                     # Fill in end.
 
@@ -152,24 +231,50 @@ def main():
                     #print("writeName: " +writeName)
                     tmpFile = open("./" + writeName,"wb")
                    
-                # print("./" + filename)
                     print("3")
 
                     # Fill in start.
                     for m in buffer:
-                        #a.write(buff[i])
                         tmpFile.write(m)
-                        #print(buff)
                         clientSocket.send(m)
                     print("4")
+                    
                     tmpFile.close()
+                    
+          
+                    rWriteName = "/" + writeName
+                    f = open(rWriteName[1:], "r")
+                    print("5")
+
+
+                    now = datetime.now()
+                    stamp = mktime(now.timetuple())
+                    dateCached =  format_date_time(stamp)
+
+                    #
+                    for line in f:
+                        if "Last-Modified" in line:
+                            dateLastMod = line.strip().split(' ', 1)[1]
+                            print(dateLastMod)
+                            break
+                    f.close()
+                    print("6")
+
+                    if writeName not in cachedFiles.keys():
+                        now = datetime.now()
+                        stamp = mktime(now.timetuple())
+                        dateCached =  format_date_time(stamp)
+                        
+                        cachedFiles.update({writeName : (dateLastMod,dateCached,activePath,hostn,hostNameForRequest,relativePath)})
+                        #{  writename for cache                    }
+
 
                 except:
                     print("Illegal request")
             else:
                 # HTTP response message for file not found
                 print '404: Not Found'
-                response += "<html><body>\n" \
+                response = "<html><body>\n" \
                 "<h1>" + "404: Not Found" + "</h1>\n" \
                 "</body></html>\n"
                 clientSocket.send(response)
@@ -180,6 +285,10 @@ def main():
     # Fill in start.
     serverSocket.close()
     # Fill in end.
+
+#def getModitfiedTime(host,filename)
+  #  fileobj.write("GET {object} HTTP/1.0\r\n".format(object=relativePath))
+  # fileobj.write("Host: {host}\r\n\r\n".format(host=hostNameForRequest))
 
 
 
